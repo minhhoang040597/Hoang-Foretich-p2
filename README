@@ -24,9 +24,3 @@ $ ./lab05
 ```
 
 ## Reflection (couldn't remember if we were supposed to do one or not so went ahead and did one anyway)
-
-Before leaving lab period last week, I finished nearly all the procedural aspects and got about halfway through the questions on the worksheet.
-Compared to my knowledge before class, I know how to download, install, and run with ncurse in unix. I also learned a thing or two about
-filepaths, the LD_LIBRARY_PATH, bash_profile, and how they are all related. Most of these things I had a little bit of experience with in previous
-computer science courses, but it was nice to get a refresher. The instructions were self explanitory and I followed them correctly as I was able to execute the program. I answered the
-worksheet questions with as much detail as a I felt was expected and necessary. This was a fun lab and I look forward to seeing what we do with ncurses in the future. 
