@@ -8,117 +8,54 @@
 using namespace std;
 int startx = 0;
 int starty = 0;
-char const * choices[] = { 
-			"Open",
-			"Save",
-			"Save As",
-			"Exit",
-		  };
-int n_choices = sizeof(choices) / sizeof(char *);
-void print_menu(WINDOW *menu_win, int highlight);
-
 
 int main(const int argc, const char * argv []){
-  //initialize curses
+      //initialize curses
   initscr();
   clear();
   noecho();
   cbreak();
   clear();
+  //Create Windows and pad
   WINDOW *pad;
-  WINDOW *win1;
-  WINDOW *win2;
-  WINDOW *win3;
+  //WINDOW *win1;
   int row, col;
-  int c1,c3;
-  int highlight=1, choice=0;
-  bool isNotOpen = TRUE;
+  int x=0, y=2;
+  int c;
+  //int highlight=1;
   getmaxyx(stdscr, row, col); 
  	startx = (col - WIDTH) / 2;
 	starty = (row - HEIGHT) / 2;
-
-  //the outer window
-  win1 = newwin(row,col,0,0);
+  //menu Menu;
+    
   pad = newpad(row,col);
-  mvwprintw(win1,1,1, "F1: Menu");
-  mvwprintw(win1,1, startx, "CSCI 1730 Editor!");
-  wrefresh(win1);
+  //To create a pad and write on it
+  mvwprintw(pad,1,1, "F1: Menu");
+  mvwprintw(pad,1, startx, "CSCI 1730 Editor!");
+  wmove(pad,y,x);
+  prefresh(pad,0,0,0,0,row,col);
+  keypad(pad,TRUE); 
   
-  //to create inner box
-  win2 = newwin(row-4, col-2, 2, 2);
-  box(win2,0,0);
-  wrefresh(win2);
+  //text editor part
+  while(1){
+   c=wgetch(pad);
+   x++;
+   mvwprintw(pad,y,x,"%c",c);
+   wmove(pad,y,x);
+   prefresh(pad, 0, 0, 0 ,0 , row,col);
+ }
   
-  win3 = newwin(HEIGHT,WIDTH,starty,startx);  
-  //To use keypad
-  keypad(pad, TRUE);
-  keypad(win1, TRUE);
-  keypad(win3,TRUE);
-  
-  //To create menu
-  c1 = wgetch(win1);
-  c3 = wgetch(win3);
-  if (c1== KEY_F(1) && isNotOpen){
-    isNotOpen=FALSE;
-    print_menu(win3,highlight);
-    while(1){	
-  		switch(c3)
-  		{	case KEY_UP:
-  				if(highlight == 1)
-  					highlight = n_choices;
-  				else
-  					--highlight;
-  				break;
-  			case KEY_DOWN:
-  				if(highlight == n_choices)
-  					highlight = 1;
-  				else 
-  					++highlight;
-  				break;
-  			case 10:
-  				choice = highlight;
-  				break;
-  		}
-  		print_menu(win3, highlight);
-  		if(choice != 0)	/* User did a choice come out of the infinite loop */
-  			break;
-  	}	
-  }
-  else if (c1 == KEY_F(1) && !isNotOpen){
-    isNotOpen=TRUE;
-    wclear(win3);
-  }
+
+  //WINDOW* win3 = Menu.createMenu(HEIGHT, WIDTH, starty, startx);  
+  //Menu.actionMenu(win3, highlight, HEIGHT, WIDTH, starty, startx);
+
 
 
   //To end the program
-  wgetch(pad);
+  getch();
+  refresh();
   endwin();
   return EXIT_SUCCESS;
 }  
 
 
-
-
-/**
-*to print the menu out 
-*
-*/
-
-void print_menu(WINDOW *menu_win, int highlight)
-{
-	int x, y, i;	
-	x = 2;
-	y = 2;
-	box(menu_win, 0, 0);
-	for(i = 0; i < n_choices; ++i)
-	{	if(highlight == i + 1) /* High light the present choice */
-		{	wattron(menu_win, A_REVERSE); 
-			mvwprintw(menu_win, y, x, "%s", choices[i]);
-			wattroff(menu_win, A_REVERSE);
-		}
-		else
-			mvwprintw(menu_win, y, x, "%s", choices[i]);
-		++y;
-	}
-	wrefresh(menu_win);
-}
