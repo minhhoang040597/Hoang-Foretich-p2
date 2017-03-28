@@ -1,280 +1,267 @@
-#include "Editor.h"
-
-#include <fstream>
+#include <ncurses.h>
+#include <string>
+#include <cstdlib>
 #include <iostream>
-#include <sstream>
-
+#include <fstream>
+#include <vector>
+#define WIDTH 30
+#define HEIGHT 10 
 using namespace std;
 
-Editor::Editor()
-{
-    x=0;y=0;mode='n';
-    status = "Normal Mode";
-    filename = "untitled";
+//INITIALIZATION
+int startx = 0;
+int starty = 0;
+int x=0, y=2;
+vector<string> lines;
+int row, col;
+int c;
+char const * choices[] = { 
+  			"Open",
+  			"Save",
+  			"Save As",
+  			"Exit",
+  		  };
+int n_choices = sizeof(choices) / sizeof(char *);
+int choice  =0;
+int highlight=1;
+bool isOpen=FALSE;
+//Prototype of functions
+void moveLeft(WINDOW* pad);
+void moveRight(WINDOW* pad);
+void moveUp(WINDOW* pad);
+void moveDown(WINDOW*pad);
+void defaultInput(WINDOW*pad);
+void backSpace(WINDOW*pad);
+void enter(WINDOW*pad);
+//Prototype for Buffer;
+void insertLine(string line, int n) ;
+void appendLine(string line);
+void removeLine(int n);
+void printLine(WINDOW*pad, int n); 
+void deleteLine();
+//Prototype for Menu;
+void printMenu(WINDOW *menuWin, int highlight);
+void destroyMenu(WINDOW *menuWin);
+void actionMenu(WINDOW* menuWin, int highlight);
+int main(const int argc, const char * argv []){
+  //initialize curses
+  initscr();
+  clear();
+  noecho();
+  cbreak();
+  clear();
+  //Create Windows and pad
+  WINDOW *pad; 
+  WINDOW *menu;
+  
+  //Vector initialize;
+  appendLine("");
 
-    /* Initializes buffer and appends line to
-        prevent seg. faults */
-    buff = new Buffer();
-    buff->appendLine("");
-}
+  getmaxyx(stdscr, row, col); 
+ 	startx = (col - WIDTH) / 2;
+	starty = (row - HEIGHT) / 2;
 
-Editor::Editor(string fn)
-{
-    x=0;y=0;mode='n';
-    status = "Normal Mode";
-    filename = fn;
+  pad = newpad(row,col);
+  menu = newwin(HEIGHT,WIDTH, starty, startx);
+  
+  
+  
+  //To create a pad and write on it
+  mvwprintw(pad,1,1, "F1: Menu");
+  mvwprintw(pad,1, startx, "CSCI 1730 Editor!");
+  wmove(pad,y,x);
+  prefresh(pad,0,0,0,0,row,col);
+  keypad(pad,TRUE); 
 
-    buff = new Buffer();
-
-    ifstream infile(fn.c_str());
-    if(infile.is_open())
-    {
-        while(!infile.eof())
-        {
-            string temp;
-            getline(infile, temp);
-            buff->appendLine(temp);
-        }
-    }
-    else
-    {
-        cerr << "Cannot open file: '" << fn << "'\n";
-        buff->appendLine("");
-    }
-}
-
-void Editor::updateStatus()
-{
-    switch(mode)
-    {
-    case 'n':
-        // Normal mode
-        status = "Normal Mode";
+  //text editor part
+  while(1){
+    switch(c=wgetch(pad)){
+      case KEY_LEFT:
+        moveLeft(pad);
         break;
-    case 'i':
-        // Insert mode
-        status = "Insert Mode";
+      case KEY_RIGHT:
+        moveRight(pad); 
         break;
-    case 'x':
-        // Exiting
-        status = "Exiting";
+      case KEY_UP:
+        moveUp(pad);
         break;
-    }
-    status += "\tCOL: " + tos(x) + "\tROW: " + tos(y);
-}
-
-string Editor::tos(int i)
-{
-    stringstream ss;
-    ss << i;
-    return ss.str();
-}
-
-void Editor::handleInput(int c)
-{
-    switch(c)
-    {
-    case KEY_LEFT:
-        moveLeft();
-        return;
-    case KEY_RIGHT:
-        moveRight();
-        return;
-    case KEY_UP:
-        moveUp();
-        return;
-    case KEY_DOWN:
-        moveDown();
-        return;
-    }
-    switch(mode)
-    {
-    case 'n':
-        switch(c)
-        {
-        case 'x':
-            // Press 'x' to exit
-            mode = 'x';
-            break;
-        case 'i':
-            // Press 'i' to enter insert mode
-            mode = 'i';
-            break;
-        case 's':
-            // Press 's' to save the current file
-            saveFile();
-            break;
-        }
+      case KEY_DOWN:
+        moveDown(pad);
         break;
-    case 'i':
-        switch(c)
-        {
-        case 27:
-            // The Escape/Alt key
-            mode = 'n';
-            break;
-        case 127:
-        case KEY_BACKSPACE:
-            // The Backspace key
-            if(x == 0 && y > 0)
-            {
-                x = buff->lines[y-1].length();
-                // Bring the line down
-                buff->lines[y-1] += buff->lines[y];
-                // Delete the current line
-                deleteLine();
-                moveUp();
-            }
-            else
-            {
-                // Removes a character
-                buff->lines[y].erase(--x, 1);
-            }
-            break;
-        case KEY_DC:
-            // The Delete key
-            if(x == buff->lines[y].length() && y != buff->lines.size() - 1)
-            {
-                // Bring the line down
-                buff->lines[y] += buff->lines[y+1];
-                // Delete the line
-                deleteLine(y+1);
-            }
-            else
-            {
-                buff->lines[y].erase(x, 1);
-            }
-            break;
-        case KEY_ENTER:
-        case 10:
-            // The Enter key
-            // Bring the rest of the line down
-            if(x < buff->lines[y].length())
-            {
-                // Put the rest of the line on a new line
-                buff->insertLine(buff->lines[y].substr(x, buff->lines[y].length() - x), y + 1);
-                // Remove that part of the line
-                buff->lines[y].erase(x, buff->lines[y].length() - x);
-            }
-            else
-            {
-                buff->insertLine("", y+1);
-            }
-            x = 0;
-            moveDown();
-            break;
-        case KEY_BTAB:
-        case KEY_CTAB:
-        case KEY_STAB:
-        case KEY_CATAB:
-        case 9:
-            // The Tab key
-            buff->lines[y].insert(x, 4, ' ');
-            x += 4;
-            break;
-        default:
-            // Any other character
-            buff->lines[y].insert(x, 1, char(c));
-            x++;
-            break;
-        }
+      case 8:
+      case KEY_BACKSPACE:
+        backSpace(pad);
+        break;  
+      case 10:  
+      case KEY_ENTER:
+        enter(pad);
+        break;  
+      case KEY_F(1):
+        if (!isOpen){
+          keypad(pad,FALSE);
+          isOpen=TRUE;
+          printMenu(menu,highlight);
+          actionMenu(menu,highlight);
+          prefresh(pad,0,0,0,0,row,col);
+          keypad(pad,TRUE);
+        }   
+        menu = newwin(HEIGHT,WIDTH, starty, startx);
+        break;
+      default:
+        defaultInput(pad);
         break;
     }
+ }
+  
+
+  //WINDOW* win3 = Menu.createMenu(HEIGHT, WIDTH, starty, startx);  
+  //Menu.actionMenu(win3, highlight, HEIGHT, WIDTH, starty, startx);
+  //To end the program
+  getch();
+  refresh();
+  endwin();
+  return EXIT_SUCCESS; 
 }
 
-void Editor::moveLeft()
-{
-    if(x-1 >= 0)
-    {
-        x--;
-        move(y, x);
+
+
+/**
+*FUNCTIONS FOR ACTIONS
+*/
+void moveLeft(WINDOW* pad){
+    if(x > 0){
+      --x;
+      wmove(pad,y, x);
+      prefresh(pad, 0, 0, 0 ,0 , row,col);
     }
 }
 
-void Editor::moveRight()
-{
-    if(x+1 < COLS && x+1 <= buff->lines[y].length())
-    {
+void moveRight(WINDOW* pad){
+    if(x < COLS-1 && x+1 <= (int)lines[y-2].length()){
         x++;
-        move(y, x);
+        wmove(pad,y, x);
+        prefresh(pad, 0, 0, 0 ,0 , row,col);
     }
 }
-
-void Editor::moveUp()
-{
-    if(y-1 >= 0)
+void moveUp(WINDOW* pad){
+    if(y-2 > 0)
         y--;
-    if(x >= buff->lines[y].length())
-        x = buff->lines[y].length();
-    move(y, x);
+    if(x >= (int)lines[y-2].length())
+        x =lines[y-2].length();
+    wmove(pad,y, x);
+    prefresh(pad, 0, 0, 0 ,0 , row,col);
 }
 
-void Editor::moveDown()
-{
-    if(y+1 < LINES-1 && y+1 < buff->lines.size())
+void moveDown(WINDOW*pad){
+    if(y-2+1 < (int)lines.size())
         y++;
-    if(x >= buff->lines[y].length())
-        x = buff->lines[y].length();
-    move(y, x);
+    if(x >= (int)lines[y-2].length())
+        x = lines[y-2].length();
+    wmove(pad,y, x);
+    prefresh(pad, 0, 0, 0 ,0 , row,col);
+}
+void defaultInput(WINDOW*pad){
+    if (x>COLS-1){y++;x=0;appendLine("");}
+    mvwinsch(pad,y,x,c);
+    lines[y-2].insert(x,1,(char)c);  
+    x++;
+    wmove(pad,y,x);
+    prefresh(pad, 0, 0, 0 ,0 , row,col);
+}
+void backSpace(WINDOW*pad){
+    if (x>0 || y-2>0){
+      if(x == 0 && y > 0){
+        x = lines[y-3].length();
+        lines[y-3] += lines[y-2];// Bring the line down
+        deleteLine();// Delete the current line
+        moveUp(pad);
+      }
+      else{
+        x--;
+        mvwdelch(pad, y, x);
+        prefresh(pad, 0, 0, 0 ,0 , row,col);
+        lines[y-2].erase(lines[y-2].begin()+x);
+      }
+    }   
+}
+void enter(WINDOW*pad){
+  if(x <(int)lines[y-2].length()){
+      insertLine(lines[y-2].substr(x, lines[y-2].length() - x), y + 1 -2);
+      lines[y-2].erase(x, lines[y-2].length() - x);
+  }
+  else{insertLine("", y+1 -2);}
+  x = 0;
+  moveDown(pad);
+}
+/**
+*BUFFER CONTROL
+*/
+void insertLine(string line, int n)  {lines.insert(lines.begin()+n, line);}
+void appendLine(string line)  {lines.push_back(line);}
+void removeLine(int n)  {lines.erase(lines.begin()+n);}
+void deleteLine()  {removeLine(y);}
+void printLine(WINDOW*pad, int n) {
+  mvwprintw(pad,n , 0, lines[n-2].c_str());
+  prefresh(pad, 0, 0, 0 ,0 , row,col);
 }
 
-void Editor::printBuff()
-{
-    for(int i=0; i<LINES-1; i++)
-    {
-        if(i >= buff->lines.size())
-        {
-            move(i, 0);
-            clrtoeol();
-        }
-        else
-        {
-            mvprintw(i, 0, buff->lines[i].c_str());
-        }
-        clrtoeol();
-    }
-    move(y, x);
+/**
+*MENU
+*/
+void printMenu(WINDOW *menuWin, int highlight){
+  int x1, y1, i;	
+	x1 = 2;
+	y1 = 2;
+	box(menuWin, 0, 0);
+	for(i = 0; i < n_choices; ++i)
+	{	if(highlight == i + 1) /* High light the present choice */
+		{	wattron(menuWin, A_REVERSE); 
+			mvwprintw(menuWin, y1, x1, "%s", choices[i]);
+			wattroff(menuWin, A_REVERSE);
+		}
+		else
+			mvwprintw(menuWin, y1, x1, "%s", choices[i]);
+		++y1;
+	}
+	wrefresh(menuWin);
+}
+void destroyMenu(WINDOW *menuWin){
+  wclear(menuWin);
+	wrefresh(menuWin);
+}
+void actionMenu(WINDOW* menuWin, int highlight){
+  int c1;
+  keypad(menuWin,TRUE);
+     while(isOpen){	
+ 		  switch(c1=wgetch(menuWin)){	
+        case KEY_UP:
+     			if(highlight == 1)
+    				highlight = n_choices;
+     			else
+     				--highlight;
+     			break;    			
+       case KEY_DOWN:
+     	   	if(highlight == n_choices)
+   					highlight = 1;
+   				else 
+  					++highlight;
+    				break;
+        case KEY_F(1):
+           isOpen=FALSE;
+           destroyMenu(menuWin);
+           break;         
+         case 10:
+     			choice = highlight;
+    				break;
+   		}
+     		printMenu(menuWin, highlight);
+     		if(choice != 0)	/* User did a choice come out of the infinite loop */
+     			break;
+      }	
 }
 
-void Editor::printStatusLine()
-{
-    attron(A_REVERSE);
-    mvprintw(LINES-1, 0, status.c_str());
-    clrtoeol();
-    attroff(A_REVERSE);
-}
+/**
+*THE FUNCTION OF MENU OPTION: OPEN, LOAD, SAVE, EXIT
+*/
 
-void Editor::deleteLine()
-{
-    buff->removeLine(y);
-}
-
-void Editor::deleteLine(int i)
-{
-    buff->removeLine(i);
-}
-
-void Editor::saveFile()
-{
-    if(filename == "")
-    {
-        // Set filename to untitled
-        filename = "untitled";
-    }
-
-    ofstream f(filename.c_str());
-    if(f.is_open())
-    {
-        for(int i=0; i<buff->lines.size(); i++)
-        {
-            f << buff->lines[i] << endl;
-        }
-        status = "Saved to file!";
-    }
-    else
-    {
-        status = "Error: Cannot open file for writing!";
-    }
-    f.close();
-}
 
