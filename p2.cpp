@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <unistd.h>
 #define WIDTH 30
 #define HEIGHT 10 
 using namespace std;
@@ -16,6 +17,7 @@ int x=0, y=2;
 vector<string> lines;
 int row, col;
 int c;
+int pos=1;
 //Init for the menu
 string choices[4] = { 
   			"Open",
@@ -23,11 +25,14 @@ string choices[4] = {
   			"Save As",
   			"Exit",
   		  };
+
 int n_choices = sizeof(choices) / sizeof(string);
 int choice=0;
 int highlight=1;
 bool isOpen=FALSE,isProgOpen=TRUE;
-char fn[80];
+bool alreadySaved = FALSE;
+char fn[80]="";
+
 //Prototype of functions
 void moveLeft(WINDOW* pad);
 void moveRight(WINDOW* pad);
@@ -36,21 +41,27 @@ void moveDown(WINDOW*pad);
 void defaultInput(WINDOW*pad);
 void backSpace(WINDOW*pad);
 void enter(WINDOW*pad);
+
 //Prototype for Buffer;
 void insertLine(string line, int n) ;
 void appendLine(string line);
 void removeLine(int n);
 void printLine(WINDOW*pad, int n); 
 void deleteLine();
+
 //Prototype for Menu;
 void printMenu(WINDOW *menuWin, int highlight);
 void destroyMenu(WINDOW *menuWin);
 void actionMenu(WINDOW* menuWin, int highlight);
+
 //Prototype for Action Menu
 void openInputMenu(WINDOW* inputWin);
 void doActionMenu(WINDOW*inputWin,WINDOW*pad);
 void exitProgram(WINDOW*pad);
 void openFile(WINDOW*inputWin, WINDOW*pad );
+void saveFile(WINDOW*inputWin,WINDOW*pad);
+void saveAsFile(WINDOW*inputWin, WINDOW*pad);
+bool fileExist (const string& name);
 
 
 int main(const int argc, const char * argv []){
@@ -61,6 +72,7 @@ int main(const int argc, const char * argv []){
   cbreak();
   clear();
   //Create Windows and pad
+  WINDOW *beginScr;
   WINDOW *pad; 
   WINDOW *menu;
     WINDOW *inputWin;
@@ -70,22 +82,25 @@ int main(const int argc, const char * argv []){
   getmaxyx(stdscr, row, col); 
  	startx = (col - WIDTH) / 2;
 	starty = (row - HEIGHT) / 2;
-
-  pad = newpad(row,col);
+  pad = newpad(10000,col);
   menu = newwin(HEIGHT,WIDTH, starty, startx);
   inputWin =newwin(HEIGHT,WIDTH, starty, startx);
-  
+  beginScr=newwin(row,col, 0,0);
   
   //To create a pad and write on it
-  mvwprintw(pad,1,1, "F1: Menu");
-  mvwprintw(pad,1, startx, "CSCI 1730 Editor!");
-  wmove(pad,y,x);
-  prefresh(pad,0,0,0,0,row,col);
+  mvwprintw(beginScr,0,0, "F1: Menu");
+  mvwprintw(beginScr,0, startx, "CSCI 1730 Editor!");
+  wrefresh(beginScr);
+  wmove(pad,y,0);
+  prefresh(pad,pos,0,1,1,row-5,col-4);
   keypad(pad,TRUE); 
 
   //text editor part
   while(isProgOpen){
+    keypad(menu,FALSE);
+    keypad(inputWin,FALSE);
     switch(c=wgetch(pad)){
+      alreadySaved = FALSE;
       case KEY_LEFT:
         moveLeft(pad);
         break;
@@ -112,10 +127,11 @@ int main(const int argc, const char * argv []){
           isOpen=TRUE;
           printMenu(menu,highlight);
           actionMenu(menu,highlight);
-          mvwprintw(pad,LINES-2,0,"Your choice: %s", choices[choice-1].c_str());
+          keypad(menu,FALSE);
           doActionMenu(inputWin, pad);
+          keypad(inputWin,FALSE);
           choice =0;
-          prefresh(pad,0,0,0,0,row,col);
+          prefresh(pad,pos,0,1,1,row-5,col-4);
           keypad(pad,TRUE);
         }   
         menu = newwin(HEIGHT,WIDTH, starty, startx);
@@ -123,6 +139,8 @@ int main(const int argc, const char * argv []){
       default:
         defaultInput(pad);
         break;
+      mvwprintw(beginScr,LINES-1,1,"File Name: %s",fn);
+      wrefresh(beginScr);
     }
  }
   
@@ -142,41 +160,45 @@ void moveLeft(WINDOW* pad){
     if(x > 0){
       --x;
       wmove(pad,y, x);
-      prefresh(pad, 0, 0, 0 ,0 , row,col);
+      prefresh(pad,pos,0,1,1,row-5,col-4);
     }
 }
 
 void moveRight(WINDOW* pad){
-    if(x < COLS-1 && x+1 <= (int)lines[y-2].length()){
+    if(x < col-4 && x+1 <= (int)lines[y-2].length()){
         x++;
         wmove(pad,y, x);
-        prefresh(pad, 0, 0, 0 ,0 , row,col);
+        prefresh(pad,pos,0,1,1,row-5,col-4);
     }
 }
 void moveUp(WINDOW* pad){
-    if(y-2 > 0)
+    if(y-2 > 0){
         y--;
+        if (y==pos){pos--;}
+    }
     if(x >= (int)lines[y-2].length())
         x =lines[y-2].length();
     wmove(pad,y, x);
-    prefresh(pad, 0, 0, 0 ,0 , row,col);
+    prefresh(pad,pos,0,1,1,row-5,col-4);
 }
 
 void moveDown(WINDOW*pad){
-    if(y-2+1 < (int)lines.size())
+    if(y-2+1 < (int)lines.size()){
         y++;
+        if (pos<(int)lines.size()-row-5){pos++;}
+    }
     if(x >= (int)lines[y-2].length())
         x = lines[y-2].length();
     wmove(pad,y, x);
-    prefresh(pad, 0, 0, 0 ,0 , row,col);
+    prefresh(pad,pos,0,1,1,row-5,col-4);
 }
 void defaultInput(WINDOW*pad){
-    if (x>COLS-1){y++;x=0;appendLine("");}
+    if (x>col-5){y++;x=0;appendLine("");}
     mvwinsch(pad,y,x,c);
     lines[y-2].insert(x,1,(char)c);  
     x++;
     wmove(pad,y,x);
-    prefresh(pad, 0, 0, 0 ,0 , row,col);
+    prefresh(pad,pos,0,1,1,row-5,col-4);
 }
 void backSpace(WINDOW*pad){
     if (x>0 || y-2>0){
@@ -189,9 +211,9 @@ void backSpace(WINDOW*pad){
       else{
         x--;
         mvwdelch(pad, y, x);
-        prefresh(pad, 0, 0, 0 ,0 , row,col);
         lines[y-2].erase(lines[y-2].begin()+x);
       }
+      prefresh(pad,pos,0,1,1,row-5,col-4);
     }   
 }
 void enter(WINDOW*pad){
@@ -199,7 +221,7 @@ void enter(WINDOW*pad){
       insertLine(lines[y-2].substr(x, lines[y-2].length() - x), y + 1 -2);
       lines[y-2].erase(x, lines[y-2].length() - x);
   }
-  else{insertLine("", y+1 -2);}
+  else{insertLine("", y+1-2);}
   x = 0;
   moveDown(pad);
 }
@@ -212,7 +234,7 @@ void removeLine(int n)  {lines.erase(lines.begin()+n);}
 void deleteLine()  {removeLine(y);}
 void printLine(WINDOW*pad, int n) {
   mvwprintw(pad,n , 0, lines[n-2].c_str());
-  prefresh(pad, 0, 0, 0 ,0 , row,col);
+  prefresh(pad,pos,0,1,1,row-5,col-4);
 }
 
 /**
@@ -280,31 +302,121 @@ void actionMenu(WINDOW* menuWin, int highlight){
 *THE FUNCTION OF MENU OPTION: OPEN, LOAD, SAVE, EXIT
 */
 void openInputMenu(WINDOW* inputWin){
+  int curX=1, curY=2;
   box(inputWin,0,0);
   mvwprintw(inputWin,1,1,"Enter File Name: ");
+  wmove(inputWin,curY,curX);
   wrefresh(inputWin);
   keypad(inputWin,TRUE);
-  char fn[80];
-  getstr(fn);
+  char filename[80]="";
+  echo();
+  wgetstr(inputWin,filename);
+  noecho();
+  wrefresh(inputWin);
+  for (int i=0;i< 80;i++){
+    fn[i]=filename[i];
+  }
 }
-
 void doActionMenu(WINDOW*inputWin,WINDOW*pad){
-  if (strcmp(choices[choice-1].c_str(), "Exit")==0){exitProgram(pad);}
-  //if (strcmp(choices[choice].c_str(), "Open")==0){openFile(inputWin,pad);}
+  if (choice-1==0){openFile(inputWin,pad);}
+  if (choice-1==1){saveFile(inputWin,pad);}
+  if (choice-1==2){saveAsFile(inputWin,pad);}
+  if (choice-1==3){exitProgram(pad);}
 }
 
 void exitProgram(WINDOW*pad){isProgOpen =FALSE;}
-/**
+
 void openFile(WINDOW*inputWin, WINDOW*pad ){
+    if ((x>0 || y-2>0)&& !alreadySaved){
+      mvwprintw(inputWin,1,1,"Do you want to save the file? y: yes or n: no");
+      wrefresh(inputWin);
+      int cs;
+      if ((cs=wgetch(inputWin)) =='y'){
+        saveFile(inputWin,pad);
+      }
+    }
     openInputMenu(inputWin);
     ifstream infile(fn);
     lines.clear();
+    appendLine("");
     if(infile.is_open()){
         while(!infile.eof()){
             string temp;
             getline(infile, temp);
             appendLine(temp);
+        }//while
+        for (int i=0; i < (int)lines.size(); i++){
+          mvwprintw(pad, i+2, 0, lines[i].c_str());
+          prefresh(pad,pos,0,1,1,row-5,col-4);
         }
+        werase(inputWin);     
+        wrefresh(inputWin);      
+    }//if
+    else{
+        mvwprintw(inputWin,1,1,"Error: Could not open a File.");
+        mvwprintw(inputWin,2,1,"Press Any Key to exit.");
+	      wrefresh(inputWin);
+        wgetch(inputWin);
+        werase(inputWin);     
+        wrefresh(inputWin);
     }
 }
-*/
+void saveFile(WINDOW*inputWin,WINDOW*pad){
+    if(strcmp(fn,"")==0){
+      saveAsFile(inputWin, pad);
+    }
+    else{
+      ofstream f(fn);
+      if(f.is_open()){
+          for(int i=0; i<(int)lines.size(); i++){
+              f << lines[i] << endl;
+          }
+          alreadySaved=TRUE;
+      }
+      else{
+          mvwprintw(inputWin,1,1,"Error: Could not open a File.");
+  	      wrefresh(inputWin);
+          wgetch(inputWin);
+          werase(inputWin);     
+          wrefresh(inputWin);
+          saveFile(inputWin, pad);
+      }   
+      f.close();
+    }
+}
+void saveAsFile(WINDOW*inputWin, WINDOW*pad){
+    openInputMenu(inputWin);
+    if (fileExist(fn)){
+        mvwprintw(inputWin,1,1,"The file is already exist. Do you want to overwrite the file? y: yes or n: no");
+        wrefresh(inputWin);
+        keypad(inputWin, TRUE);
+        int cs;
+        if ((cs=wgetch(inputWin)) =='y'){
+          saveFile(inputWin,pad);
+        }
+        keypad(inputWin,FALSE);     
+    }//if
+    else{
+        ofstream f(fn);
+        if(f.is_open()){
+            for(int i=0; i<(int)lines.size(); i++){
+                f << lines[i] << endl;
+            }
+            alreadySaved=TRUE;
+        }
+        else{
+            mvwprintw(inputWin,1,1,"Error: Could not open a File.");
+    	      wrefresh(inputWin);
+            wgetch(inputWin);
+            werase(inputWin);     
+            wrefresh(inputWin);
+            saveFile(inputWin, pad);
+      }//else       
+      f.close();
+    }
+}
+   
+bool fileExist (const string& name) {
+    ifstream f(name.c_str());
+    return f.good();
+}
