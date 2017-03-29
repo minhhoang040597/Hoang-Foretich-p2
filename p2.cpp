@@ -72,10 +72,10 @@ int main(const int argc, const char * argv []){
   cbreak();
   clear();
   //Create Windows and pad
-  WINDOW *beginScr;
+  //WINDOW *beginScr;
   WINDOW *pad; 
   WINDOW *menu;
-    WINDOW *inputWin;
+  WINDOW *inputWin;
   //Vector initialize;
   appendLine("");
 
@@ -85,18 +85,22 @@ int main(const int argc, const char * argv []){
   pad = newpad(10000,col);
   menu = newwin(HEIGHT,WIDTH, starty, startx);
   inputWin =newwin(HEIGHT,WIDTH, starty, startx);
-  beginScr=newwin(row,col, 0,0);
+  //beginScr=newwin(row,col, 0,0);
   
   //To create a pad and write on it
-  mvwprintw(beginScr,0,0, "F1: Menu");
-  mvwprintw(beginScr,0, startx, "CSCI 1730 Editor!");
-  wrefresh(beginScr);
+  mvwprintw(stdscr,0,0, "F1: Menu");
+  mvwprintw(stdscr,0, startx, "CSCI 1730 Editor!");
+  wrefresh(stdscr);
   wmove(pad,y,0);
   prefresh(pad,pos,0,1,1,row-5,col-4);
   keypad(pad,TRUE); 
 
   //text editor part
   while(isProgOpen){
+    mvwprintw(stdscr,LINES-2,0,"File Name: %s",fn);
+    wrefresh(stdscr);
+    wmove(pad,y,x);
+    prefresh(pad,pos,0,1,1,row-5,col-4);
     keypad(menu,FALSE);
     keypad(inputWin,FALSE);
     switch(c=wgetch(pad)){
@@ -139,8 +143,6 @@ int main(const int argc, const char * argv []){
       default:
         defaultInput(pad);
         break;
-      mvwprintw(beginScr,LINES-1,1,"File Name: %s",fn);
-      wrefresh(beginScr);
     }
  }
   
