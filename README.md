@@ -34,7 +34,7 @@ such as buffers, windows, and pads, just to name a few. It is also
 worth mentioning that our program has padded line numbers and multiple
 colors. This project was challenging, and as a result sometimes frustrating, but
 we learned a lot and were thrilled to be able to apply our ncurses knowledge.
-Below are a couple sources we felt we should cite:z
+Below are a couple sources we felt we should cite:
 
 
 
